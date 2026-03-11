@@ -1,0 +1,139 @@
+name: sdn-ids
+
+# Management Network
+mgmt:
+  ipv4-subnet: 172.10.10.0/24
+  ipv4-gw: 172.10.10.1
+
+topology:
+  nodes:
+    # ============================================
+    # SDN Controller with IDS Integration
+    # ============================================
+    ctrl:
+      kind: linux
+      image: martimy/ryu-flowmanager:latest
+      mgmt-ipv4: 172.10.10.10
+      binds:
+        - ../ryu_ids:/home/auser/ids_app
+        - ../config:/home/auser/config
+        - ../utils:/home/auser/utils
+        - ./ryu_apps:/home/auser/labs
+      publish:
+        - tcp/8080
+        - tcp/6633
+      entrypoint: ryu-manager flowmanager/flowmanager.py labs/ids_spine_leaf.py --observe-links
+
+    # ============================================
+    # ML Inference Service
+    # ============================================
+    ml_service:
+      kind: linux
+      image: python:3.10-slim
+      mgmt-ipv4: 172.10.10.100
+      binds:
+        - ../ml_service:/app/ml_service
+        - ../models:/app/models
+        - ../config:/app/config
+        - ../utils:/app/utils
+        - ./requirements_ml.txt:/app/requirements.txt
+      publish:
+        - tcp/5000
+      exec:
+        - pip install -r /app/requirements.txt
+      cmd: python /app/ml_service/inference_server.py
+
+    # ============================================
+    # Normal Hosts (Legitimate Traffic)
+    # ============================================
+    h11:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.11
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:01
+        - ip addr add 192.168.11.1/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    h12:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.12
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:02
+        - ip addr add 192.168.11.2/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    h21:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.21
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:03
+        - ip addr add 192.168.11.3/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    h22:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.22
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:04
+        - ip addr add 192.168.11.4/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    # ============================================
+    # Attack Hosts (Malicious Traffic Generation)
+    # ============================================
+    attacker1:
+      kind: linux
+      image: kalilinux/kali-rolling
+      mgmt-ipv4: 172.10.10.31
+      binds:
+        - ./attack_scripts:/attack
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:05
+        - ip addr add 192.168.11.5/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    victim:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.32
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:06
+        - ip addr add 192.168.11.6/24 dev eth1
+        - ip route add 192.168.0.0/16 dev eth1
+
+    # ============================================
+    # OVS Switches - Spine Layer
+    # ============================================
+    spine1:
+      kind: ovs-bridge
+
+    spine2:
+      kind: ovs-bridge
+
+    # ============================================
+    # OVS Switches - Leaf Layer
+    # ============================================
+    leaf1:
+      kind: ovs-bridge
+
+    leaf2:
+      kind: ovs-bridge
+
+    leaf3:
+      kind: ovs-bridge
+
+  # ============================================
+  # Network Links
+  # ============================================
+  links:
+    # Host to Leaf connections
+    - endpoints: ["h11:eth1", "leaf1:p1"]
+    - endpoints: ["h12:eth1", "leaf1:p2"]
+    - endpoints: ["h21:eth1", "leaf2:p3"]
+    - endpoints: ["h22:eth1", "leaf2:p4"]
+    - endpoints: ["attacker1:eth1", "leaf3:p5"]
+    - endpoints: ["victim:eth1", "leaf3:p6"]
