@@ -1,0 +1,34 @@
+# Dockerfile for Ryu Controller with IDS Module
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libffi-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    ryu \
+    eventlet \
+    requests \
+    numpy
+
+# Copy application code
+COPY config/ ./config/
+COPY ryu_ids/ ./ryu_ids/
+COPY utils/ ./utils/
+
+# Expose OpenFlow and REST API ports
+EXPOSE 6653
+EXPOSE 8080
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Run Ryu with IDS module
+CMD ["ryu-manager", "ryu_ids/ids_app.py", "--observe-links"]
