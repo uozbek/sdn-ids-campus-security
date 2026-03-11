@@ -1,0 +1,93 @@
+name: sdn-dcn
+
+# Define custom IPv4 subent for the management network 
+mgmt:
+  ipv4-subnet: 172.10.10.0/24
+  ipv4-gw: 172.10.10.1
+
+topology:
+  nodes:
+    ctrl:
+      kind: linux
+      image: martimy/ryu-flowmanager:latest
+      mgmt-ipv4: 172.10.10.10
+      binds:
+        - config:/home/auser/labs
+      publish:
+        - tcp/8080
+# Modify the entry point for a differnt app
+      entrypoint: ryu-manager flowmanager/flowmanager.py labs/spine_leaf_1.py
+
+# Uncomment the following if you want to use sflow
+#    sflow:
+#      kind: linux
+#      image: sflow/sflowtrend
+#      mgmt_ipv4: 172.10.10.100
+#      publish:
+#        - udp/6343
+#        - tcp/8087
+#        - tcp/8443
+#      env:
+#        TZ: America/Halifax
+    h11:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.11
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:01
+        - ip addr add 192.168.11.1/24 dev eth1
+    h12:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.12
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:02
+        - ip addr add 192.168.11.2/24 dev eth1
+    h21:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.21
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:03
+        - ip addr add 192.168.11.3/24 dev eth1
+    h22:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.22
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:04
+        - ip addr add 192.168.11.4/24 dev eth1
+    h31:
+      kind: linux
+      image: wbitt/network-multitool:alpine-minimal
+      mgmt-ipv4: 172.10.10.31
+      exec:
+       - ip link set dev eth1 address 00:00:00:00:00:05
+       - ip addr add 192.168.11.5/24 dev eth1
+    h32:
+      kind: linux
+      mgmt-ipv4: 172.10.10.32
+      image: wbitt/network-multitool:alpine-minimal
+      exec:
+        - ip link set dev eth1 address 00:00:00:00:00:06
+        - ip addr add 192.168.11.6/24 dev eth1
+# The switches must be created manually before running clab
+    spine1:
+      kind: ovs-bridge
+    spine2:
+      kind: ovs-bridge
+    leaf1:
+      kind: ovs-bridge
+    leaf2:
+      kind: ovs-bridge
+    leaf3:
+      kind: ovs-bridge
+# Link hosts to switches. Inter-switch links are 
+# created using a shell script
+  links:
+    - endpoints: ["h11:eth1", "leaf1:p1"]
+    - endpoints: ["h12:eth1", "leaf1:p2"]
+    - endpoints: ["h21:eth1", "leaf2:p3"]
+    - endpoints: ["h22:eth1", "leaf2:p4"]
+    - endpoints: ["h31:eth1", "leaf3:p5"]
+    - endpoints: ["h32:eth1", "leaf3:p6"]
