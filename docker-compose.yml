@@ -1,0 +1,50 @@
+# Docker Compose Configuration for SDN-IDS System
+# Containerlab ile entegre test ortami
+
+version: '3.8'
+
+services:
+  ml-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    container_name: sdn-ids-ml-service
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./models:/app/models
+      - ./config:/app/config
+    environment:
+      - ML_SERVICE_HOST=0.0.0.0
+      - ML_SERVICE_PORT=5000
+    networks:
+      - sdn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ryu-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.ryu
+    container_name: sdn-ids-controller
+    ports:
+      - "6653:6653"
+      - "8080:8080"
+    depends_on:
+      - ml-service
+    environment:
+      - ML_SERVICE_URL=http://ml-service:5000
+    networks:
+      - sdn-network
+    restart: unless-stopped
+
+networks:
+  sdn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
